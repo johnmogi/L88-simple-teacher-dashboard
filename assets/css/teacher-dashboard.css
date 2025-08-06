@@ -1,0 +1,314 @@
+/* Main Dashboard Styles */
+.simple-teacher-dashboard {
+    font-family: Arial, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    direction: rtl;
+}
+
+/* Admin Selector */
+.admin-teacher-selector {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+}
+
+.admin-teacher-selector h3 {
+    margin-top: 0;
+    color: #23282d;
+}
+
+.teacher-selector-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.teacher-selector-form select {
+    min-width: 200px;
+    padding: 8px;
+    border-radius: 3px;
+    border: 1px solid #8c8f94;
+}
+
+/* Group Selector */
+.group-selector-container {
+    margin: 20px 0;
+}
+
+.group-selector {
+    min-width: 300px;
+    padding: 10px;
+    border-radius: 3px;
+    border: 1px solid #8c8f94;
+}
+
+/* Students Display */
+.students-display-area {
+    margin-top: 20px;
+}
+
+.select-group-message {
+    font-style: italic;
+    color: #666;
+    text-align: center;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px dashed #ddd;
+    border-radius: 5px;
+}
+
+/* Table Styles */
+.table-responsive {
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.students-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.students-table th,
+.students-table td {
+    padding: 12px 15px;
+    text-align: right;
+    border: 1px solid #e2e4e7;
+}
+
+.students-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #23282d;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Sortable Table Styles - Clean without icons */
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    position: relative;
+    border-bottom: 2px solid transparent;
+}
+
+.sortable:hover {
+    background-color: #e8f4f8 !important;
+    color: #2271b1 !important;
+    border-bottom-color: #2271b1;
+}
+
+.sortable:active {
+    background-color: #d0e7f0 !important;
+    transform: translateY(1px);
+}
+
+/* Sorted header states - visual feedback without icons */
+.sortable.sorted-asc {
+    background-color: #f0f8ff;
+    border-bottom-color: #0073aa;
+    font-weight: 600;
+}
+
+.sortable.sorted-desc {
+    background-color: #f0f8ff;
+    border-bottom-color: #0073aa;
+    font-weight: 600;
+}
+
+.students-table th:hover {
+    background-color: #f0f0f1;
+}
+
+.students-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.students-table tbody tr:hover {
+    background-color: #f0f7fc;
+}
+
+/* Quiz Rate Colors */
+.quiz-rate.excellent {
+    color: #00a32a;
+    font-weight: bold;
+}
+
+.quiz-rate.good {
+    color: #72aee6;
+    font-weight: bold;
+}
+
+.quiz-rate.average {
+    color: #ffb900;
+    font-weight: bold;
+}
+
+.quiz-rate.needs-improvement {
+    color: #d63638;
+    font-weight: bold;
+}
+
+/* Course Completion */
+.course-completion {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.course-name {
+    font-weight: 500;
+}
+
+.completion-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.completion-status.completed {
+    color: #00a32a;
+    background-color: rgba(0, 163, 42, 0.1);
+}
+
+.completion-status.in-progress {
+    color: #dba617;
+    background-color: rgba(219, 166, 23, 0.1);
+}
+
+.completion-status.not-started {
+    color: #d63638;
+    background-color: rgba(214, 54, 56, 0.1);
+}
+
+/* No Data */
+.no-data {
+    color: #72777c;
+    font-style: italic;
+}
+
+/* Group Stats */
+.group-stats {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border: 1px solid #e2e4e7;
+}
+
+.group-stats h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #23282d;
+}
+
+/* Buttons */
+.button {
+    display: inline-block;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 2.15384615;
+    min-height: 30px;
+    margin: 0;
+    padding: 0 10px;
+    cursor: pointer;
+    border-width: 1px;
+    border-style: solid;
+    -webkit-appearance: none;
+    border-radius: 3px;
+    white-space: nowrap;
+    box-sizing: border-box;
+    background: #f6f7f7;
+    border-color: #016087;
+    color: #016087;
+    margin-right: 5px;
+    margin-top: 10px;
+}
+
+.button:hover {
+    background: #f0f0f1;
+    border-color: #014f6e;
+    color: #014f6e;
+}
+
+/* Responsive Adjustments */
+@media screen and (max-width: 782px) {
+    .students-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .teacher-selector-form {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .teacher-selector-form select,
+    .group-selector {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .simple-teacher-dashboard {
+        padding: 0;
+    }
+    
+    .admin-teacher-selector,
+    .group-selector-container,
+    .table-actions {
+        display: none !important;
+    }
+    
+    .students-table {
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    .students-table th,
+    .students-table td {
+        padding: 8px 10px;
+    }
+    
+    .group-buttons, .export-buttons, .table-controls {
+        display: none;
+    }
+    
+    .students-table {
+        overflow-x: auto;
+    }
+    
+    /* Hide any remaining emojis in print */
+    .emoji, 
+    img[src*="emoji"], 
+    img[alt="📄"], img[alt="🖨"],
+    img[role="img"][class="emoji"] {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+    
+    /* Clean table headers for print */
+    .sortable {
+        cursor: default;
+    }
+    
+    /* Ensure good contrast for print */
+    .quiz-rate {
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+}

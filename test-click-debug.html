@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Click Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin: 15px 0; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .group-btn { padding: 10px 20px; margin: 5px; border: 1px solid #007cba; background: white; color: #007cba; cursor: pointer; border-radius: 4px; }
+        .group-btn.active { background: #007cba; color: white; }
+        #students-display { min-height: 200px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin: 20px 0; background: #f9f9f9; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; font-size: 12px; max-height: 300px; overflow-y: auto; }
+        #debug-log { background: #000; color: #0f0; font-family: monospace; padding: 15px; border-radius: 5px; max-height: 200px; overflow-y: auto; }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test Click Debug</h1>
+        
+        <div class="card">
+            <h2>Simulate Dashboard Clicks</h2>
+            <p>This simulates exactly what happens in your dashboard:</p>
+            
+            <div class="group-buttons">
+                <button class="group-btn" data-group-id="10025">Class: TA2 (Group 10025)</button>
+                <button class="group-btn" data-group-id="10027">Class: TEST (Group 10027)</button>
+                <button class="group-btn" data-group-id="10028">Class: TA (Group 10028)</button>
+                <button class="group-btn" data-group-id="10029">Class: TEST (Group 10029)</button>
+                <button class="group-btn" data-group-id="10030">Class: 2 (Group 10030)</button>
+            </div>
+            
+            <div id="students-display">
+                <p>Click a group button above to test the AJAX call.</p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Debug Log</h2>
+            <div id="debug-log"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Raw Response</h2>
+            <pre id="raw-response"></pre>
+        </div>
+    </div>
+
+    <script>
+    jQuery(document).ready(function($) {
+        // Simulate the exact dashboard data you're getting
+        var groupsData = {
+            groups: {},
+            ajaxurl: 'https://207lilac.local/wp-admin/admin-ajax.php',
+            nonce: '0d0a2b7882' // Using the nonce from your console log
+        };
+        
+        var currentStudents = [];
+        var currentSort = { column: 'completed', direction: 'asc' };
+        
+        function debugLog(message) {
+            var timestamp = new Date().toLocaleTimeString();
+            $('#debug-log').append('<div>[' + timestamp + '] ' + message + '</div>');
+            $('#debug-log').scrollTop($('#debug-log')[0].scrollHeight);
+            console.log(message);
+        }
+        
+        function renderStudentsTable(students) {
+            debugLog('renderStudentsTable called with ' + students.length + ' students');
+            
+            if (!students || students.length === 0) {
+                $('#students-display').html('<p>No students found in this group.</p>');
+                return;
+            }
+            
+            var html = '<h3>Students (' + students.length + ' found)</h3>';
+            html += '<table style="width:100%; border-collapse: collapse;">';
+            html += '<tr style="background: #f8f9fa;"><th style="padding: 10px; border: 1px solid #ddd;">Name</th><th style="padding: 10px; border: 1px solid #ddd;">Email</th><th style="padding: 10px; border: 1px solid #ddd;">Login</th></tr>';
+            
+            students.forEach(function(student) {
+                html += '<tr>';
+                html += '<td style="padding: 10px; border: 1px solid #ddd;">' + student.display_name + '</td>';
+                html += '<td style="padding: 10px; border: 1px solid #ddd;">' + student.user_email + '</td>';
+                html += '<td style="padding: 10px; border: 1px solid #ddd;">' + student.user_login + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            $('#students-display').html(html);
+        }
+        
+        // Handle group button clicks - EXACT copy from your dashboard
+        $(document).on('click', '.group-btn', function() {
+            var groupId = $(this).data('group-id');
+            
+            debugLog('Group button clicked: ' + groupId);
+            
+            // Remove active class from all buttons and add to clicked one
+            $('.group-btn').removeClass('active');
+            $(this).addClass('active');
+            
+            if (!groupId) {
+                $('#students-display').html('<p class="select-group-message">Please select a group to see students.</p>');
+                return;
+            }
+
+            // Show loading
+            $('#students-display').html('<div class="loading">Loading data...</div>');
+            
+            var ajaxUrl = groupsData.ajaxurl || '/wp-admin/admin-ajax.php';
+            var nonce = groupsData.nonce || '';
+            
+            debugLog('AJAX URL: ' + ajaxUrl);
+            debugLog('Nonce: ' + nonce);
+            debugLog('Group ID: ' + groupId);
+
+            // Get students for the selected group
+            $.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'get_group_students',
+                    group_id: groupId,
+                    nonce: nonce
+                },
+                success: function(response) {
+                    debugLog('AJAX Success received');
+                    $('#raw-response').text(JSON.stringify(response, null, 2));
+                    
+                    if (response.success) {
+                        debugLog('Response success = true');
+                        currentStudents = response.data.students;
+                        debugLog('Students data: ' + JSON.stringify(currentStudents));
+                        renderStudentsTable(currentStudents);
+                    } else {
+                        debugLog('Response success = false');
+                        var errorMsg = 'An error occurred';
+                        if (response.data) {
+                            if (typeof response.data === 'string') {
+                                errorMsg += ': ' + response.data;
+                            } else if (response.data.message) {
+                                errorMsg += ': ' + response.data.message;
+                            } else {
+                                errorMsg += ': ' + JSON.stringify(response.data);
+                            }
+                        }
+                        $('#students-display').html('<p>' + errorMsg + '</p>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    debugLog('AJAX Error: ' + error);
+                    debugLog('Status: ' + status);
+                    debugLog('Response: ' + xhr.responseText);
+                    
+                    $('#raw-response').text('ERROR: ' + xhr.responseText);
+                    
+                    var errorMsg = 'Error loading data.';
+                    if (xhr.responseJSON && xhr.responseJSON.data) {
+                        errorMsg += ' Error: ' + xhr.responseJSON.data;
+                    } else if (xhr.responseText) {
+                        errorMsg += ' Details: ' + xhr.responseText;
+                    }
+                    $('#students-display').html('<p>' + errorMsg + '</p>');
+                }
+            });
+        });
+        
+        debugLog('Click debug initialized');
+        debugLog('Dashboard data: ' + JSON.stringify(groupsData));
+    });
+    </script>
+</body>
+</html>
