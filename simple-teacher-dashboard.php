@@ -478,135 +478,92 @@ class Simple_Teacher_Dashboard {
         // Debug logging
         error_log("[QUIZ DEBUG] Getting quiz stats for student ID: $student_id");
         
-        // Method 1: Try to get quiz scores from pro_quiz_statistic tables (most accurate)
-        $pro_quiz_query = "
+        // Analyze quiz breakdown by enforce hint status using learndash_user_activity (actual data source)
+        $quiz_breakdown = $wpdb->get_row($wpdb->prepare("
             SELECT 
-                COUNT(ref.statistic_ref_id) as total_attempts,
-                COUNT(DISTINCT ref.quiz_post_id) as unique_quizzes,
-                COALESCE(ROUND(AVG(
-                    CASE 
-                        WHEN quiz_scores.total_questions > 0 THEN (quiz_scores.earned_points / quiz_scores.total_questions) * 100
-                        ELSE 0
-                    END
-                ), 1), 0) as overall_success_rate,
-                COALESCE(ROUND(AVG(
-                    CASE 
-                        WHEN quiz_scores.total_questions > 0 AND quiz_scores.earned_points > 0 
-                        THEN (quiz_scores.earned_points / quiz_scores.total_questions) * 100
-                        ELSE NULL
-                    END
-                ), 1), 0) as completed_only_rate,
-                GROUP_CONCAT(CONCAT(quiz_scores.earned_points, '/', quiz_scores.total_questions) SEPARATOR ', ') as debug_scores
-            FROM {$wpdb->prefix}learndash_pro_quiz_statistic_ref ref
-            INNER JOIN (
-                SELECT 
-                    statistic_ref_id,
-                    SUM(points) as earned_points,
-                    COUNT(*) as total_questions
-                FROM {$wpdb->prefix}learndash_pro_quiz_statistic
-                GROUP BY statistic_ref_id
-                HAVING COUNT(*) > 0
-            ) quiz_scores ON ref.statistic_ref_id = quiz_scores.statistic_ref_id
-            WHERE ref.user_id = %d
+                COUNT(DISTINCT ua.post_id) as total_attempted_quizzes,
+                SUM(CASE WHEN pm.meta_value = '1' THEN 1 ELSE 0 END) as attempted_with_enforce_hint,
+                SUM(CASE WHEN pm.meta_value IS NULL OR pm.meta_value <> '1' THEN 1 ELSE 0 END) as attempted_without_enforce_hint
+            FROM {$wpdb->prefix}learndash_user_activity ua
+            LEFT JOIN {$wpdb->prefix}postmeta pm 
+                ON pm.post_id = ua.post_id AND pm.meta_key = '_ld_quiz_enforce_hint'
+            WHERE ua.user_id = %d 
+            AND ua.activity_type = 'quiz'
+            AND ua.activity_completed > 0
+        ", $student_id), ARRAY_A);
+        
+        if ($quiz_breakdown) {
+            error_log("[QUIZ DEBUG] Student $student_id quiz breakdown - Total: {$quiz_breakdown['total_attempted_quizzes']}, With Enforce Hint: {$quiz_breakdown['attempted_with_enforce_hint']}, Real Quizzes: {$quiz_breakdown['attempted_without_enforce_hint']}");
+        }
+        
+        // Use learndash_user_activity table (actual data source) with enforce hint filtering
+        // Method 1: Get ALL quiz data from user activity (using latest attempt per quiz)
+        $all_quiz_query = "
+            SELECT 
+                COUNT(*) as total_quizzes,
+                SUM(CASE WHEN latest_attempts.activity_status = 1 THEN 1 ELSE 0 END) as completed_quizzes,
+                ROUND((SUM(CASE WHEN latest_attempts.activity_status = 1 THEN 1 ELSE 0 END) / 
+                       COUNT(*) * 100), 2) as overall_success_rate
+            FROM (
+                SELECT ua.post_id, ua.activity_status,
+                       ROW_NUMBER() OVER (PARTITION BY ua.post_id ORDER BY ua.activity_updated DESC) as rn
+                FROM {$wpdb->prefix}learndash_user_activity ua
+                WHERE ua.activity_type = 'quiz'
+                AND ua.user_id = %d
+                AND ua.activity_completed > 0
+            ) latest_attempts
+            WHERE latest_attempts.rn = 1
         ";
         
-        $pro_quiz_result = $wpdb->get_row($wpdb->prepare($pro_quiz_query, $student_id), ARRAY_A);
+        $all_quiz_result = $wpdb->get_row($wpdb->prepare($all_quiz_query, $student_id), ARRAY_A);
+        error_log("[QUIZ DEBUG] All quiz result for student $student_id (ALL QUIZZES): " . print_r($all_quiz_result, true));
         
-        // Debug logging
-        if ($pro_quiz_result) {
-            error_log("[QUIZ DEBUG] Pro quiz result for student $student_id: " . print_r($pro_quiz_result, true));
+        // Method 2: Get FILTERED quiz data excluding enforce hint quizzes (using latest attempt per quiz)
+        $real_quiz_query = "
+            SELECT 
+                COUNT(*) as total_quizzes,
+                SUM(CASE WHEN latest_attempts.activity_status = 1 THEN 1 ELSE 0 END) as completed_quizzes,
+                ROUND((SUM(CASE WHEN latest_attempts.activity_status = 1 THEN 1 ELSE 0 END) / 
+                       COUNT(*) * 100), 2) as overall_success_rate
+            FROM (
+                SELECT ua.post_id, ua.activity_status,
+                       ROW_NUMBER() OVER (PARTITION BY ua.post_id ORDER BY ua.activity_updated DESC) as rn
+                FROM {$wpdb->prefix}learndash_user_activity ua
+                LEFT JOIN {$wpdb->prefix}postmeta pm 
+                    ON pm.post_id = ua.post_id AND pm.meta_key = '_ld_quiz_enforce_hint'
+                WHERE ua.activity_type = 'quiz'
+                AND ua.user_id = %d
+                AND ua.activity_completed > 0
+                AND (pm.meta_value IS NULL OR pm.meta_value <> '1')
+            ) latest_attempts
+            WHERE latest_attempts.rn = 1
+        ";
+        
+        $real_quiz_result = $wpdb->get_row($wpdb->prepare($real_quiz_query, $student_id), ARRAY_A);
+        error_log("[QUIZ DEBUG] Real quiz result for student $student_id (REAL QUIZZES ONLY): " . print_r($real_quiz_result, true));
+        
+        // Return filtered results if available
+        if ($real_quiz_result && $real_quiz_result['total_quizzes'] > 0) {
+            return array(
+                'total_attempts' => intval($real_quiz_result['total_quizzes']),
+                'unique_quizzes' => intval($real_quiz_result['total_quizzes']),
+                'overall_success_rate' => floatval($real_quiz_result['overall_success_rate']),
+                'completed_only_rate' => floatval($real_quiz_result['overall_success_rate'])
+            );
         }
         
-        // If we have data from pro_quiz_statistic, use it
-        if ($pro_quiz_result && $pro_quiz_result['total_attempts'] > 0) {
-            // Fix for completed_only_rate being 0 when it shouldn't be
-            if ($pro_quiz_result['completed_only_rate'] == 0 && $pro_quiz_result['overall_success_rate'] > 0) {
-                error_log("[QUIZ DEBUG] Fixing completed_only_rate for student $student_id");
-                
-                // Recalculate completed only rate
-                $fix_query = "
-                    SELECT 
-                        ROUND(AVG(
-                            CASE 
-                                WHEN quiz_scores.total_questions > 0 AND quiz_scores.earned_points > 0
-                                THEN (quiz_scores.earned_points / quiz_scores.total_questions) * 100
-                                ELSE NULL
-                            END
-                        ), 1) as fixed_completed_rate
-                    FROM {$wpdb->prefix}learndash_pro_quiz_statistic_ref ref
-                    INNER JOIN (
-                        SELECT 
-                            statistic_ref_id,
-                            SUM(points) as earned_points,
-                            COUNT(*) as total_questions
-                        FROM {$wpdb->prefix}learndash_pro_quiz_statistic
-                        GROUP BY statistic_ref_id
-                        HAVING COUNT(*) > 0 AND SUM(points) > 0
-                    ) quiz_scores ON ref.statistic_ref_id = quiz_scores.statistic_ref_id
-                    WHERE ref.user_id = %d
-                ";
-                
-                $fixed_rate = $wpdb->get_var($wpdb->prepare($fix_query, $student_id));
-                if ($fixed_rate > 0) {
-                    $pro_quiz_result['completed_only_rate'] = $fixed_rate;
-                    error_log("[QUIZ DEBUG] Fixed completed_only_rate to $fixed_rate for student $student_id");
-                }
-            }
-            
-            return $pro_quiz_result;
-        }
-        
-        // Method 2: Fallback to learndash_user_activity table
-        error_log("[QUIZ DEBUG] No pro quiz data found, trying learndash_user_activity for student $student_id");
-        
-        $activity_scores = $wpdb->get_results($wpdb->prepare("
-            SELECT activity_meta, activity_updated
-            FROM {$wpdb->prefix}learndash_user_activity
-            WHERE user_id = %d AND activity_type = 'quiz' AND activity_status = 1
-        ", $student_id));
-        
-        if (count($activity_scores) > 0) {
-            error_log("[QUIZ DEBUG] Found " . count($activity_scores) . " activity records for student $student_id");
-            
-            $total_percentage = 0;
-            $valid_scores = 0;
-            $completed_percentage = 0;
-            $completed_scores = 0;
-            
-            foreach ($activity_scores as $score) {
-                $meta = maybe_unserialize($score->activity_meta);
-                error_log("[QUIZ DEBUG] Activity meta for student $student_id: " . print_r($meta, true));
-                
-                if (isset($meta['percentage']) && is_numeric($meta['percentage'])) {
-                    $percentage = floatval($meta['percentage']);
-                    $total_percentage += $percentage;
-                    $valid_scores++;
-                    
-                    // Only count non-zero scores for completed rate
-                    if ($percentage > 0) {
-                        $completed_percentage += $percentage;
-                        $completed_scores++;
-                    }
-                }
-            }
-            
-            if ($valid_scores > 0) {
-                $overall_average = round($total_percentage / $valid_scores, 1);
-                $completed_average = $completed_scores > 0 ? round($completed_percentage / $completed_scores, 1) : 0;
-                
-                error_log("[QUIZ DEBUG] Calculated averages for student $student_id - Overall: $overall_average%, Completed: $completed_average%");
-                
-                return array(
-                    'total_attempts' => $valid_scores,
-                    'unique_quizzes' => $valid_scores,
-                    'overall_success_rate' => $overall_average,
-                    'completed_only_rate' => $completed_average
-                );
-            }
+        // If no real quiz data but we have ALL quiz data, return zeros to indicate filtering removed all data
+        if ($all_quiz_result && $all_quiz_result['total_quizzes'] > 0) {
+            error_log("[QUIZ DEBUG] No real quiz attempts found, but ALL quiz data exists for student $student_id - returning zeros to indicate filtered out");
+            return array(
+                'total_attempts' => 0,
+                'unique_quizzes' => 0,
+                'overall_success_rate' => 0,
+                'completed_only_rate' => 0
+            );
         }
         
         // No quiz data at all - return zeros to indicate "אין נתונים"
-        // This covers both students with no attempts and students with only empty attempts
         error_log("[QUIZ DEBUG] No quiz data found for student $student_id");
         return array(
             'total_attempts' => 0,

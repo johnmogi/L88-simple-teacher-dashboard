@@ -91,4 +91,3 @@ For issues or questions, refer to:
 - LearnDash LMS plugin
 - jQuery (automatically loaded)
 - Users with appropriate teacher roles or group leader permissions
-# L88-simple-teacher-dashboard
